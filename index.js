@@ -1,66 +1,55 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const validUrl = require('valid-url');
 const app = express();
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-
 app.use(express.urlencoded({extended: true}));
-
 app.use('/public', express.static(`${process.cwd()}/public`));
 
 app.get('/', function(req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-// Your first API endpoint
-app.get('/api/hello', function(req, res) {
-  res.json({ greeting: 'hello API' });
-});
+// Object to store original and shortened URLs
+const urlMap = {};
 
-const originalUrls = [];
-const shortnerUrls = [];
+// Function to generate unique short URL ID
+function generateShortUrlId() {
+  return Object.keys(urlMap).length + 1; // You can use a more sophisticated method for generating unique IDs
+}
 
 app.post("/api/shorturl", (req, res) => {
-  const url = req.body.url;
-  const findIndex = originalUrls.indexOf(url);
+  const { url } = req.body;
 
-  if(!url.includes("https://") && !url.includes("http://")){
-    res.json({error: "invalid url"});
+  if (!validUrl.isWebUri(url)) {
+    return res.status(400).json({ error: "Invalid URL" });
   }
 
-  if(findIndex < 0) {
-    originalUrls.push(url);
-    shortnerUrls.push(shortnerUrls.length)
-
-    return res.json({
-      original_url: url,
-      short_url: shortnerUrls.length - 1
-    });
+  if (urlMap[url]) {
+    return res.json({ original_url: url, short_url: urlMap[url] });
   }
 
-  return res.json({
-    original_url: url,
-    short_url: shortnerUrls[findIndex]
-  })
+  const shortUrlId = generateShortUrlId();
+  urlMap[url] = shortUrlId;
 
-})
+  return res.json({ original_url: url, short_url: shortUrlId });
+});
 
 app.get("/api/shorturl/:shorturl", (req, res) => {
-  const p_shorturl = req.params.shorturl;
-  const findIndex = shortnerUrls.indexOf(p_shorturl);
+  const shortUrlId = req.params.shorturl;
+  const originalUrl = Object.keys(urlMap).find(url => urlMap[url] == shortUrlId);
 
-  if(findIndex < 0) {
-    res.json({
-      error: "No short URL found for the given input"
-    })
+  if (!originalUrl) {
+    return res.status(404).json({ error: "No URL found for the given short URL" });
   }
 
-  res.redirect(originalUrls[findIndex]);
-})
+  res.redirect(originalUrl);
+});
 
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
