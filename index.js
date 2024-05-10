@@ -27,7 +27,7 @@ app.post("/api/shorturl", (req, res) => {
   const { url } = req.body;
 
   if (!validUrl.isWebUri(url)) {
-    return res.status(400).json({ error: "invalid url" });
+    return res.json({ error: "invalid url" });
   }
 
   if (urlMap[url]) {
